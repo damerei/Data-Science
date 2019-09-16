@@ -13,6 +13,13 @@ from scipy.stats import weightedtau, kendalltau, spearmanr, pearsonr
 
 
 def _get_eigen_vector(dot_matrix, variance_thresh):
+    """
+    
+    Get eigen values and eigen vector from matrix which explain % variance_thresh of total variance
+    :param dot_matrix: (np.array): matrix for which eigen values/vectors should be computed
+    :param variance_thresh: (float): % of overall variance which compressed vectors should explain
+    :return: (pd.Series, pd.DataFrame): eigen values, eigen vectors
+    """
     eigen_val, eigen_vec = np.linalg.eigh(dot_matrix)
     idx = eigen_val.argsort()[::-1]  # Arguments for sorting eigen_val desc
     eigen_val, eigen_vec = eigen_val[idx], eigen_vec[:, idx]
@@ -29,7 +36,13 @@ def _get_eigen_vector(dot_matrix, variance_thresh):
     return eigen_val, eigen_vec
 
 def get_orthogonal_features(feature_df, variance_thresh=.95):
- 
+    """
+    
+    Get the orthogonalized features of a PCA. 
+    :param feature_df: (pd.DataFrame): with features
+    :param variance_thresh: (float): % of overall variance which compressed vectors should explain
+    :return: (pd.DataFrame): compressed PCA features which explain %variance_thresh of variance
+    """
     feature_df_standard = feature_df.sub(feature_df.mean(), axis=1).div(feature_df.std(), axis=1)  
     dot_matrix = pd.DataFrame(np.dot(feature_df_standard.T, feature_df_standard), index=feature_df.columns,
                               columns=feature_df.columns)
@@ -38,10 +51,27 @@ def get_orthogonal_features(feature_df, variance_thresh=.95):
     return pca_features
 
 def get_pca_rank_weighted_kendall_tau(feature_imp, pca_rank):
+    """
+    Compute Kendall's weighted tau (hyperbolic). 
+    :param feature_imp: (np.array): with feature mean importance
+    :param pca_rank: (np.array): PCA based feature importance rank
+    :return: (float): weighted Kendall tau of feature importance and inverse PCA rank with p_value
+    """
     return weightedtau(feature_imp, pca_rank ** -1.)
 
 def feature_pca_concordance(feature_df, feature_importance, variance_thresh=0.975):
-    feature_df_standard = _standardize_df(feature_df) 
+  
+    """
+    Perform correlation analysis between feature importance (MDI for example, supervised)
+    and PCA eigen values (unsupervised). High correlation means that probably the pattern identified
+    by the ML algorithm is not entirely overfit.
+    :param feature_df: (pd.DataFrame): with features
+    :param feature_importance: (pd.DataFrame): individual MDI feature importance
+    :param variance_thresh: (float): % of overall variance which compressed vectors should explain in PCA compression
+    :return: (dict): with kendall, spearman, pearson and weighted_kendall correlations and p_values
+    """
+
+    feature_df_standard = feature_df.sub(feature_df.mean(), axis=1).div(feature_df.std(), axis=1) 
     dot = pd.DataFrame(np.dot(feature_df_standard.T, feature_df_standard), index=feature_df.columns,
                        columns=feature_df.columns)
     eigen_val, eigen_vec = _get_eigen_vector(dot, variance_thresh)
